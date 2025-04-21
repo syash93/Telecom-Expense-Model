@@ -1,0 +1,62 @@
+import snowflake.connector
+from snowflake.connector import Error
+
+def get_recommendations():
+    """Recommend cost-saving plans and calculate savings for users with overage"""
+    conn = cur = None
+    recommendations = []
+    
+    try:
+        # Snowflake connection (replace placeholders)
+        conn = snowflake.connector.connect(
+            user='SYASH7DS',
+            password='Cr7@middleeast',
+            account='UPFGHCN-DP49561',  # e.g. abcd-xy12345.snowflakecomputing.com
+            warehouse='compute_wh',
+            database='temmodel',
+            schema='PUBLIC'
+        )
+        
+        # Single database interaction
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT user_id, monthly_usage_gb, overage_gb, total_cost 
+                FROM usage_report 
+                WHERE overage_gb > 0
+            """)
+            
+            for user_id, usage, overage, current_cost in cur:
+                plan_name, plan_cost = ("10 GB Plan", 50) if usage < 10 else ("Unlimited VDM", 75)
+                savings = current_cost - plan_cost
+                
+                recommendations.append({
+                    'user_id': user_id,
+                    'new_plan': plan_name,
+                    'new_cost': plan_cost,
+                    'savings': savings,
+                    'current_usage': usage,
+                    'current_cost': current_cost
+                })
+
+        # Print formatted results
+        print(f"{'User ID':<10} {'Recommended Plan':<20} {'Current Cost':<15} {'New Cost':<15} {'Monthly Savings':<15}")
+        for rec in recommendations:
+            print(f"{rec['user_id']:<10} {rec['new_plan']:<20} "
+                  f"${rec['current_cost']:<14.2f} ${rec['new_cost']:<14} "
+                  f"${rec['savings']:<14.2f}")
+
+        return recommendations
+
+    except Error as e:
+        print(f"Database error: {e}")
+        return []
+        
+    finally:
+        # Unified resource cleanup
+        if cur: cur.close()
+        if conn: 
+            conn.close()
+            print("\nConnection closed")
+
+if __name__ == "__main__":
+    get_recommendations()
